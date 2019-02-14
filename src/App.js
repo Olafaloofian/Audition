@@ -11,7 +11,7 @@ class App extends Component<Props, State> {
   }
 
   multiply  = (x: number, y: number): number => {
-    return 'hi'
+    return 0
   }
 
   render() {
