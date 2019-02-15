@@ -1,4 +1,9 @@
-### Flow notes
+## Flow notes
+
+---
+---
+
+### Flow Types
 
 ---
 
@@ -457,3 +462,14 @@ method({ foo: 1, bar: true, baz: ["oops"] });
 ```
 
 - This allows you to use Flow without any extra work!
+
+---
+---
+
+### General Notes
+
+- When Flow says it can't find a module or definition, run `npm run flow-typed install`. This will add Flow types from valid libdefs and stub any types that haven't been contributed yet.
+
+  - This command is possible because `"flow-typed": "flow-typed",` was added to `"scripts"` in package.json.
+
+- React has some [special types](https://flow.org/en/docs/react/) that you can use for React-related stuff. 

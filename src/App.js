@@ -1,5 +1,8 @@
 import React, { Component } from 'react';
-import Room from './Components/Room'
+// import Room from './Components/Room'
+import TEST from './Components/TEST'
+import SocketConfiguration from './Components/Utility/SocketConfiguration'
+import MediaConfiguration from './Components/Utility/MediaConfiguration'
 import './App.css';
 
 type Props = {}
@@ -18,7 +21,12 @@ class App extends Component<Props, State> {
     return (
       <div>
         Audition
-        <Room />
+        {/* <Room /> */}
+        <SocketConfiguration>
+          <MediaConfiguration>
+            <TEST />
+          </ MediaConfiguration>
+        </ SocketConfiguration>
       </div>
     );
   }
