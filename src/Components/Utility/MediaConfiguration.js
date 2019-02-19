@@ -1,22 +1,5 @@
 import * as React from 'react'
 import PropTypes from 'prop-types'
-import type { MixedFunction, PrimitivePromise } from '../../FlowTypes.js'
-import type { WebSocket } from './SocketConfiguration'
-
-// Type for connectionStatus state object
-type MediaStatus = { 
-    active?: boolean,
-    id?: string,
-    onactive?: ?MixedFunction,
-    onaddtrack?: ?MixedFunction,
-    oninactive?: ?MixedFunction,
-    onremovetrack?: ?MixedFunction,
-    message?: string
-} | null
-
-// Types for WebRTC configs
-type MediaArray = () =>  Array<{stop: MixedFunction, enabled: mixed}>
-type StreamObject = { getVideoTracks: MediaArray }
 
 // Component props and state go here
 type Props = {
@@ -44,12 +27,36 @@ class MediaConfiguration extends React.Component<Props, State> {
 
         this.pc = new RTCPeerConnection({iceServers: [{urls: 'stun:stun.l.google.com:19302'}]})
         this.dc = this.pc.createDataChannel('chat')
+        // this.stream = this.
     }
 
     componentDidMount(): void {
         this.accessUserMedia()
-        this.init()
+        this.props.socket.on('chat', this.onMessage)
     }
+
+      onMessage = (message) => {
+      if (message.type === 'offer') {
+          // set remote description and answer
+          this.pc.setRemoteDescription(new RTCSessionDescription(message));
+          this.pc.createAnswer()
+            .then(this.setDescription)
+            .then(this.sendDescription)
+            // .catch(this.handleError); // An error occurred, so handle the failure to connect
+
+      } else if (message.type === 'answer') {
+          // set remote description
+          this.pc.setRemoteDescription(new RTCSessionDescription(message));
+      } else if (message.type === 'candidate') {
+          // add ice candidate
+          this.pc.addIceCandidate(
+              new RTCIceCandidate({
+                  sdpMLineIndex: message.mlineindex,
+                  candidate: message.candidate
+              })
+          );
+      }
+  }
 
     setupDataHandlers = (): void => {
         this.dc.onmessage = (e: { data?: ?mixed }): void => {
@@ -68,6 +75,10 @@ class MediaConfiguration extends React.Component<Props, State> {
 
     sendDescription = (): void => {
         this.props.socket.send(this.pc.localDescription);
+    }
+
+    sendData = (message: string) => {
+        this.dc.send(JSON.stringify(message))
     }
 
     init = (): void => {
@@ -95,11 +106,11 @@ class MediaConfiguration extends React.Component<Props, State> {
         this.pc.ondatachannel = (e: {channel: RTCDataChannel}) => {
             this.dc = e.channel
             this.setupDataHandlers() 
-            this.sendData({
+            this.dc.send(JSON.stringify(({
                 peerMediaStream: {
                     audio: this.localStream.getVideoTracks()[0].enabled
                 }
-            })
+            })))
         }
     }
 
@@ -124,10 +135,14 @@ class MediaConfiguration extends React.Component<Props, State> {
         console.log('PC', this.pc)
         console.log('PROPS', this.props)
         console.groupEnd()
+
+        const { children, socket } = this.props
+
+        const childrenWithProps: Array<React.Node> = React.Children.map(children, (child: React.Element<any>, index: number): React.Node => React.cloneElement(child, { ...this.props }))
         return (
-            <div>
-                Room
-            </div>
+            <>
+                {childrenWithProps}
+            </>
         )
     }
 }
