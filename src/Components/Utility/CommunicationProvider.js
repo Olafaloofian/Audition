@@ -22,7 +22,8 @@ type Props = {
     children?: React.ChildrenArray<*>
 }
 type State = {
-    connectionStatus: MediaStatus
+    connectionStatus: MediaStatus,
+    rtcConnection: {} | null
 }
 
 // RTCPeerConnection variables
@@ -51,7 +52,7 @@ type State = {
 class CommunicationProvider extends React.Component<Props, State> {
     offerConnection: PeerConnection
     answerConnection: PeerConnection
-    accessUserMedia: () => Promise<mixed> | void
+    accessUserMedia: (connection: {}) => Promise<mixed> | void
 
     constructor(props: Props) {
         super(props)
@@ -65,7 +66,7 @@ class CommunicationProvider extends React.Component<Props, State> {
     componentDidMount() {
     }
 
-    answer = (userid): void => {
+    answer = (userid: string): void => {
         this.answerConnection = new PeerConnection(this.props.socket)
 
                 this.answerConnection.onStreamAdded = (element: {mediaElement: mixed}):void => {
@@ -74,30 +75,44 @@ class CommunicationProvider extends React.Component<Props, State> {
         this.answerConnection.sendParticipationRequest(userid)
     }
 
-    initialize = (userid): void => {
+    initialize = (username, room): void => {
         const webRtcConnection = new PeerConnection(this.props.socket)
         this.setState({
             rtcConnection: webRtcConnection
         })
-        console.log(webRtcConnection)
         // webRtcConnection.onStreamAdded = (element: {mediaElement: mixed}):void => {
         //     console.log('------------ element', element)
         // }
-        this.accessUserMedia().then(userMedia => {
-            console.log('ACCESS')
-            webRtcConnection.addStream(userMedia)
-            // this.offerConnection.startBroadcasting()
+        this.accessUserMedia(webRtcConnection).then(() => {
+            const streamData = {
+                username,
+                room,
+                stream: this.state.connectionStatus,
+                rtcConnection: this.state.rtcConnection
+            }
+            this.props.socket.emit('join', streamData)
         })
+        // this.offerConnection.startBroadcasting()
     }
 
-    async accessUserMedia(): Promise<mixed> | void {
+    async accessUserMedia(username, room): Promise<mixed> | void {
         let userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: true}) : null
+        const webRtcConnection = new PeerConnection(this.props.socket)
+        console.log('------------ webRtcConnection', webRtcConnection)
         try {
             if(userMedia) {
-                // this.offerConnection.addStream(userMedia)
-                console.log('Mic access granted!')
+                webRtcConnection.addStream(userMedia)
                 this.setState({
-                    connectionStatus: userMedia
+                    connectionStatus: userMedia,
+                    rtcConnection: webRtcConnection
+                }, () => {
+                    const streamData = {
+                        username,
+                        room,
+                        stream: this.state.connectionStatus,
+                        rtcConnection: this.state.rtcConnection
+                    }
+                    this.props.socket.emit('join', streamData)
                 })
                 return userMedia
             }
@@ -112,7 +127,7 @@ class CommunicationProvider extends React.Component<Props, State> {
         console.log('PROPS', this.props)
         console.groupEnd()
 
-        const connectionTools: {accessUserMedia: MixedFunction, call: MixedFunction, answer: MixedFunction} = {
+        const connectionTools: {accessUserMedia: MixedFunction, initialize: MixedFunction, answer: MixedFunction} = {
             accessUserMedia: this.accessUserMedia,
             initialize: this.initialize,
             answer: this.answer,

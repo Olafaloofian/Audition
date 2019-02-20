@@ -20,7 +20,7 @@ io.sockets.on('connection', socket => {
         onlineCount++
         console.log('------------ user', userData)
         socket.join(userData.room)
-        if(!currentStreams.find(stream => stream.userid === data.userid)) {
+        if(!currentStreams.find(stream => stream.userid === userData.userid)) {
             currentStreams.push(userData)
         }
         console.log('CURRENT STREAMS', currentStreams)

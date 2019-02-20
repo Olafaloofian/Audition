@@ -3,16 +3,18 @@ import hark from 'hark'
 
 // Component props and state go here
 type Props = {
-    socket: WebSocket
+    socket: WebSocket,
+    connectionTools: {}
 }
 type State = {
     username: string,
     room: string,
-    speaking: boolean
+    speaking: boolean,
+    users: Array<mixed>
 }
 
 export default class Room extends React.Component<Props, State> {
-    constructor(props) {
+    constructor(props: Props) {
         super(props)
         this.state = {
             username: '',
@@ -32,11 +34,11 @@ export default class Room extends React.Component<Props, State> {
 
     }
 
-    componentDidUpdate(prevProps) {
+    componentDidUpdate(prevProps: Props) {
         if(prevProps.connectionTools !== this.props.connectionTools && this.props.connectionTools.connectionStatus) {
             this.audio.srcObject = this.props.connectionTools.connectionStatus
             const speech = hark(this.props.connectionTools.connectionStatus)
-            speech.on('speaking', (volume) => {
+            speech.on('speaking', () => {
                 this.setState({
                     speaking: true
                 })
@@ -57,14 +59,15 @@ export default class Room extends React.Component<Props, State> {
 
     joinRoom = (): void => {
         const { username, room } = this.state
-        this.props.connectionTools.initialize()
+        console.log('------------ this.props.connectionTools', this.props.connectionTools)
+        this.props.connectionTools.accessUserMedia(username, room)
         const streamData = {
             username,
             room,
             stream: this.props.connectionTools.connectionStatus,
             rtcConnection: this.props.connectionTools.rtcConnection
         }
-        this.props.socket.emit('join', streamData)
+        // this.props.socket.emit('join', streamData)
     }
 
     render(): React.Node {
