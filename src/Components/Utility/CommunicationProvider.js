@@ -1,5 +1,6 @@
 import * as React from 'react'
 import PropTypes from 'prop-types'
+import axios from 'axios'
 
 // Type for connectionStatus state object
 type MediaStatus = { 
@@ -65,8 +66,9 @@ class CommunicationProvider extends React.Component<Props, State> {
     }
 
     acceptOffer = (userid: string): void => {
-        const accept = new PeerConnection(this.props.socket)
-        accept.acceptRequest(userid)
+        const answerConnection = new PeerConnection(this.props.socket)
+        answerConnection.acceptRequest(userid)
+        console.log('------------ answerConnection', answerConnection)
     }
 
     makeOffer = (userid) => {
@@ -76,43 +78,67 @@ class CommunicationProvider extends React.Component<Props, State> {
         availableConnection.sendParticipationRequest(userid)
     }
 
+    initializeConnection = (mediaStream) => {
+        const newConnection = new PeerConnection(this.props.socket)
+
+        newConnection.addStream(mediaStream)
+        
+        // newConnection.onStreamAdded = (stream):void => {
+        //     const newPeerConnections = [...this.state.peerConnections, stream]
+        //     this.setState({
+        //         peerConnections: newPeerConnections
+        //     })
+        //     console.log('------------ STREAM', stream)
+        // }
+
+        newConnection.onStreamEnded = () => {   
+            console.log('------------ stream END')
+        }
+
+        newConnection.onParticipationRequest = (userid) => {
+            console.warn('PARTICIPATION REQUEST')
+            newConnection.acceptRequest(userid)
+        }
+
+        console.warn('NEW PEERCONNECTION MADE', newConnection)
+
+        return newConnection
+    }
+
     async newPendingConnection(username, room): void {
         const userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true}}) : null
+        const usersInRoom = await axios.get(`/api/users-in-room?room=${room}`)
         try {
-            if(userMedia) {
-                const newConnection = new PeerConnection(this.props.socket)
-
-                newConnection.addStream(userMedia)
-
-                // newConnection.onStreamAdded = (stream):void => {
-                //     const newPeerConnections = [...this.state.peerConnections, stream]
-                //     this.setState({
-                //         peerConnections: newPeerConnections
-                //     })
-                //     console.log('------------ STREAM', stream)
-                // }
-
-                newConnection.onStreamEnded = () => {
-                    console.log('------------ stream END')
+            if(userMedia && usersInRoom) {
+                console.warn('------------ usersInRoom  data axios', usersInRoom)
+                let connectionArray
+                if(usersInRoom.data.length) {
+                    // There are already users in the current room
+                    connectionArray = usersInRoom.data.map(user => this.initializeConnection(userMedia, user))
+                    // Loop through connectionArray and sendParticipation request to each user in usersInRoom.data
+                    for(let i=0; i<connectionArray.length; i++) {
+                        console.log('------------ connectionArray[i]', connectionArray[i])
+                        connectionArray[i].sendParticipationRequest(usersInRoom.data[i].openConnection.userid)
+                    }
+                } else {
+                    // This user is the first one in the room and needs an initial peer connection
+                    connectionArray = []
                 }
+                    this.setState(prevState => {
+                        return { pendingConnections: [...prevState.pendingConnections, ...connectionArray ]}
+                    })
 
-                newConnection.onParticipationRequest = (userid) => {
-                    console.warn('PARTICIPATION REQUEST')
-                    newConnection.acceptRequest(userid)
-                }
+                    const connectionData = {
+                        username,
+                        room,
+                        openConnection: this.initializeConnection(userMedia),
+                        currentConnnections: connectionArray,
+                        socketid: this.props.socket.id
+                    }
 
-                this.setState(prevState => {
-                    return { pendingConnections: [...prevState.pendingConnections, newConnection ]}
-                })
+                    this.props.socket.emit('join', connectionData)
 
-                const connectionData = {
-                    username,
-                    room,
-                    userid: newConnection.userid,
-                    socketid: this.props.socket.id
-                }
 
-                this.props.socket.emit('join', connectionData)
             }
         } catch(error) {
             console.error(error)

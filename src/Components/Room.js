@@ -1,6 +1,7 @@
 import * as React from 'react'
 import hark from 'hark'
 import PeerAudio from './Utility/PeerAudio'
+import axios from 'axios'
 
 // Component props and state go here
 type Props = {
@@ -24,17 +25,17 @@ export default class Room extends React.Component<Props, State> {
             audioTracks: []
         }
 
-        this.props.socket.on('roomUsers', (data) => {
-            // New users array can't have any old users or current pending connections in it.
-            const newUsers = data.filter(user => !this.state.users.find(person => person.userid === user.userid) && !this.props.pendingConnections.find(connection => connection.userid === user.userid))
-            console.log('------------ newUsers', newUsers)
-            if(newUsers.length) {
-                newUsers.forEach(user => this.props.makeOffer(user.userid))
-            }
-            this.setState({
-                users: data
-            })
-        })
+        // this.props.socket.on('roomUsers', (data) => {
+        //     // New users array can't have any old users or current pending connections in it.
+        //     const newUsers = data.filter(user => !this.state.users.find(person => person.userid === user.userid) && !this.props.pendingConnections.find(connection => connection.userid === user.userid))
+        //     console.log('------------ newUsers', newUsers)
+        //     if(newUsers.length) {
+        //         newUsers.forEach(user => this.props.makeOffer(user.userid))
+        //     }
+        //     this.setState({
+        //         users: data
+        //     })
+        // })
 
         this.props.socket.on('message', data => {
             // if(data.broadcasting && data.userid !== this.props.rtcConnection.userid) {
@@ -59,13 +60,11 @@ export default class Room extends React.Component<Props, State> {
     }
 
     componentDidMount() {
-        
+   
     }
 
     makeOffersToCurrentUsers = () => {
-        axios.get(`/api/users-in-room/?room=${this.state.room}`).then(data => {
-            console.log('------------ user.users', data.users)
-        })
+
     }
 
     componentDidUpdate(prevProps: Props, prevState: State) {

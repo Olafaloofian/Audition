@@ -2,9 +2,9 @@ const express = require('express')
 const app = express()
 const server = require('http').createServer(app)
 const io = require('socket.io')(server)
-// const bodyParser = require('body-parser')
+const bodyParser = require('body-parser')
 
-// app.use(bodyParser.json())
+app.use(bodyParser.json())
 
 const port = 4020
 
@@ -50,6 +50,13 @@ io.sockets.on('connection', socket => {
         onlineUsers.splice(userIndex, 1)
         socket.broadcast.emit('onlineUsers', onlineUsers)
     })
+})
+
+app.get('/api/users-in-room', (req, res) => {
+    const { room } = req.query
+    const usersInRoom = onlineUsers.filter(user => user.room === room)
+    console.log('------REQUEST USERS')
+    res.status(200).send(usersInRoom)
 })
 
 const path = require("path");
