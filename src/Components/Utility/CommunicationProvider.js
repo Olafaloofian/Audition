@@ -52,74 +52,95 @@ type State = {
 class CommunicationProvider extends React.Component<Props, State> {
     offerConnection: PeerConnection
     answerConnection: PeerConnection
+    peerConnection: PeerConnection
     accessUserMedia: (connection: {}) => Promise<mixed> | void
 
     constructor(props: Props) {
         super(props)
         this.state = {
-            connectionStatus: null,
-            rtcConnection: null
+            pendingConnections: [],
+            successfulConnections: []
         }
-        this.accessUserMedia = this.accessUserMedia.bind(this)
+        this.newPendingConnection = this.newPendingConnection.bind(this)
     }
 
-    componentDidMount() {
+    acceptOffer = (userid: string): void => {
+        const accept = new PeerConnection(this.props.socket)
+        accept.acceptRequest(userid)
     }
 
-    answer = (userid: string): void => {
-        this.answerConnection = new PeerConnection(this.props.socket)
-
-                this.answerConnection.onStreamAdded = (element: {mediaElement: mixed}):void => {
-            console.log('------------ element', element)
-        } 
-        this.answerConnection.sendParticipationRequest(userid)
+    makeOffer = (userid) => {
+        console.log('++++++USERID+++++++', userid)
+        const availableConnection = [...this.state.pendingConnections].shift()
+        console.log('------------ availableConnection', availableConnection)
+        availableConnection.sendParticipationRequest(userid)
     }
 
-    initialize = (username, room): void => {
-        const webRtcConnection = new PeerConnection(this.props.socket)
-        this.setState({
-            rtcConnection: webRtcConnection
-        })
-        // webRtcConnection.onStreamAdded = (element: {mediaElement: mixed}):void => {
-        //     console.log('------------ element', element)
-        // }
-        this.accessUserMedia(webRtcConnection).then(() => {
-            const streamData = {
-                username,
-                room,
-                stream: this.state.connectionStatus,
-                rtcConnection: this.state.rtcConnection
-            }
-            this.props.socket.emit('join', streamData)
-        })
-        // this.offerConnection.startBroadcasting()
-    }
-
-    async accessUserMedia(username, room): Promise<mixed> | void {
-        let userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: true}) : null
-        const webRtcConnection = new PeerConnection(this.props.socket)
-        console.log('------------ webRtcConnection', webRtcConnection)
+    async newPendingConnection(username, room): void {
+        const userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true}}) : null
         try {
             if(userMedia) {
-                webRtcConnection.addStream(userMedia)
-                this.setState({
-                    connectionStatus: userMedia,
-                    rtcConnection: webRtcConnection
-                }, () => {
-                    const streamData = {
-                        username,
-                        room,
-                        stream: this.state.connectionStatus,
-                        rtcConnection: this.state.rtcConnection
-                    }
-                    this.props.socket.emit('join', streamData)
+                const newConnection = new PeerConnection(this.props.socket)
+
+                newConnection.addStream(userMedia)
+
+                // newConnection.onStreamAdded = (stream):void => {
+                //     const newPeerConnections = [...this.state.peerConnections, stream]
+                //     this.setState({
+                //         peerConnections: newPeerConnections
+                //     })
+                //     console.log('------------ STREAM', stream)
+                // }
+
+                newConnection.onStreamEnded = () => {
+                    console.log('------------ stream END')
+                }
+
+                newConnection.onParticipationRequest = (userid) => {
+                    console.warn('PARTICIPATION REQUEST')
+                    newConnection.acceptRequest(userid)
+                }
+
+                this.setState(prevState => {
+                    return { pendingConnections: [...prevState.pendingConnections, newConnection ]}
                 })
-                return userMedia
+
+                const connectionData = {
+                    username,
+                    room,
+                    userid: newConnection.userid,
+                    socketid: this.props.socket.id
+                }
+
+                this.props.socket.emit('join', connectionData)
             }
         } catch(error) {
             console.error(error)
         }
     }
+
+    // async accessUserMedia(username: string, room: string): Promise<mixed> | void {
+    //     let userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true}}) : null
+    //     try {
+    //         if(userMedia) {
+    //             this.peerConnection.addStream(userMedia)
+    //             this.setState({
+    //                 rtcConnection: this.peerConnection
+    //             }, () => {
+    //                 const streamData = {
+    //                     username,
+    //                     room,
+    //                     userid: this.peerConnection.userid,
+    //                     socketid: this.props.socket.id
+    //                 }
+    //                 this.props.socket.emit('join', streamData)
+    //             })
+    //             return userMedia
+    //         }
+    //     } catch(error) {
+    //         console.error(error)
+    //     }
+    // }
 
     render(): React.Node {
         console.groupCollapsed('MediaConfiguration')
@@ -127,17 +148,17 @@ class CommunicationProvider extends React.Component<Props, State> {
         console.log('PROPS', this.props)
         console.groupEnd()
 
-        const connectionTools: {accessUserMedia: MixedFunction, initialize: MixedFunction, answer: MixedFunction} = {
-            accessUserMedia: this.accessUserMedia,
-            initialize: this.initialize,
-            answer: this.answer,
-            connectionStatus: this.state.connectionStatus,
-            rtcConnection: this.state.rtcConnection
+        const connectionTools: {accessUserMedia: MixedFunction, initialize: MixedFunction, acceptOffer: MixedFunction} = {
+            newPendingConnection: this.newPendingConnection,
+            acceptOffer: this.acceptOffer,
+            makeOffer: this.makeOffer,
+            pendingConnections: this.state.pendingConnections,
+            successfulConnections: this.state.successfulConnections
         }
 
         const { children, socket } = this.props
 
-        const childrenWithProps: Array<React.Node> = React.Children.map(children, (child: React.Element<any>, index: number): React.Node => React.cloneElement(child, { socket, connectionTools }))
+        const childrenWithProps: Array<React.Node> = React.Children.map(children, (child: React.Element<any>, index: number): React.Node => React.cloneElement(child, { socket, ...connectionTools }))
         return (
             <>
                 {childrenWithProps}

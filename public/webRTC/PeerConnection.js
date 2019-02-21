@@ -39,12 +39,14 @@
             socket.send({
                 participationRequest: true,
                 userid: root.userid,
-                to: userid
+                fromSocketId: socket.id,
+                to: userid,
             });
         };
 
         // if someone shared SDP
         this.onsdp = function(message) {
+            console.log('------------ SDP Message', message)
             var sdp = message.sdp;
 
             if (sdp.type == 'offer') {
@@ -52,10 +54,12 @@
                     MediaStream: root.MediaStream,
                     sdp: sdp
                 }));
+                console.log('=== OFFERCONNECTION', root)
             }
 
             if (sdp.type == 'answer') {
-                root.peers[message.userid].setRemoteDescription(sdp);
+                console.log('=== ANSWERCONNECTION', root)
+                root.peers[root.participant].peer.setRemoteDescription(sdp)
             }
         };
 
@@ -75,7 +79,10 @@
                     peer.addIceCandidate(candidates[i]);
                 }
                 candidates = [];
-            } else candidates.push(candidates);
+            } else {
+                candidates.push(candidates);
+                console.log('!!==========!!', candidates)
+            }
         };
 
         // it is passed over Offer/Answer objects for reusability
@@ -101,15 +108,7 @@
                     if (root.onStreamEnded) root.onStreamEnded(streamObject);
                 };
 
-                var mediaElement = document.createElement('video');
-                mediaElement.id = root.participant;
-                mediaElement.srcObject =  stream;
-                mediaElement.autoplay = true;
-                mediaElement.controls = true;
-                mediaElement.play();
-
                 var streamObject = {
-                    mediaElement: mediaElement,
                     stream: stream,
                     participantid: root.participant
                 };
@@ -322,8 +321,8 @@
                 if (event.candidate)
                     config.onicecandidate(event.candidate);
             };
-
-            peer.setRemoteDescription(new RTCSessionDescription(config.sdp)).then(function() {
+            console.log('------------ IN ANSWER', peer)
+            peer.setRemoteDescription(config.sdp).then(function() {
                 peer.createAnswer(offerAnswerConstraints).then(function(sdp) {
                     peer.setLocalDescription(sdp);
                     config.onsdp(sdp);

@@ -10,32 +10,35 @@ const port = 4020
 
 app.use(express.static(`${__dirname}/../build`));
 
+let onlineUsers = []
+let pendingRequests = []
+let pendingOffers = []
+
 io.sockets.on('connection', socket => {
     let room
-    let currentUsers = []
-    let currentStreams = []
+    let connections = {}
+    let currentUsersInRoom = []
     let onlineCount = 0
 
     socket.on('join', userData => {
+        const room = userData.room
         onlineCount++
-        console.log('------------ user', userData)
-        socket.join(userData.room)
-        if(!currentStreams.find(stream => stream.userid === userData.userid)) {
-            currentStreams.push(userData)
+        socket.join(room)
+        if(!onlineUsers.find(user => user === userData)) {
+            onlineUsers.push(userData)
         }
-        console.log('CURRENT STREAMS', currentStreams)
-        socket.emit('currentStreams', currentStreams)
-        console.log('Client joined!')
+        console.log('CURRENT STREAMS', onlineUsers)
+        const usersInRoom = onlineUsers.filter(user => { 
+            return user.room === room
+        })
+        io.in(room).emit('roomUsers', usersInRoom)
     })
 
     socket.on('message', data => {
-        console.log('------------ data', socket.id)
-        // if(!currentStreams.find(stream => stream.userid === data.userid)) {
-        //     currentStreams.push(data)
-        // }
-        // console.log('CURRENT STREAMS', currentStreams)
-        socket.emit('currentStreams', currentStreams)
-        io.sockets.to(data.recipient).emit('message', data.message)
+        // socket.broadcast.emit('message', data)
+        console.log('MESSAGE FROM PEERCONNECTION', data)
+        let currentUser = onlineUsers.find(user => user.socketid === socket.id)
+        currentUser && io.in(currentUser.room).emit('message', data)
     })
 
     socket.on('userPresence', data => {
@@ -43,9 +46,9 @@ io.sockets.on('connection', socket => {
     })
 
     socket.on('disconnect', user => {
-        let userIndex = currentUsers.findIndex(userObject => userObject === user)
-        currentUsers.splice(userIndex, 1)
-        socket.broadcast.emit('currentUsers', currentUsers)
+        let userIndex = onlineUsers.findIndex(userObject => userObject === user)
+        onlineUsers.splice(userIndex, 1)
+        socket.broadcast.emit('onlineUsers', onlineUsers)
     })
 })
 
@@ -53,7 +56,7 @@ const path = require("path");
 // app.get("*", (req, res) => {
 // 	res.sendFile(path.join(__dirname, "../build/index.html"));
 // });
- 
+
 server.listen(port, () => {
     console.info(`Server is listening on port ${port} 🌆`)
 })
