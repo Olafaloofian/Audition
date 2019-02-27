@@ -22,12 +22,13 @@ export default class SocketConfiguration extends React.Component<Props> {
 
     render(): React.Node {
         console.groupCollapsed('SocketConfiguration')
-        console.log('------------ this.socket', this.socket)
+        console.log('SOCKET', this.socket)
         console.groupEnd()
 
         const { children } = this.props
         const { socket } = this
 
+        // Map over children and append the socket to props
         const childrenWithProps: Array<React.Node> = React.Children.map(children, (child: React.Element<any>, index: number): React.Node => React.cloneElement(child, { ...this.props, socket }))
 
         return (

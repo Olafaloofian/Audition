@@ -24,7 +24,7 @@ type Props = {
 }
 type State = {
     connectionStatus: MediaStatus,
-    rtcConnection: {} | null
+    openConnection: [] | null
 }
 
 // RTCPeerConnection variables
@@ -51,122 +51,83 @@ type State = {
 
 
 class CommunicationProvider extends React.Component<Props, State> {
-    offerConnection: PeerConnection
-    answerConnection: PeerConnection
     peerConnection: PeerConnection
-    accessUserMedia: (connection: {}) => Promise<mixed> | void
 
     constructor(props: Props) {
         super(props)
         this.state = {
-            pendingConnections: [],
             successfulConnections: []
         }
-        this.newPendingConnection = this.newPendingConnection.bind(this)
-    }
-
-    acceptOffer = (userid: string): void => {
-        const answerConnection = new PeerConnection(this.props.socket)
-        answerConnection.acceptRequest(userid)
-        console.log('------------ answerConnection', answerConnection)
-    }
-
-    makeOffer = (userid) => {
-        console.log('++++++USERID+++++++', userid)
-        const availableConnection = [...this.state.pendingConnections].shift()
-        console.log('------------ availableConnection', availableConnection)
-        availableConnection.sendParticipationRequest(userid)
+        this.newConnection = this.newConnection.bind(this)
     }
 
     initializeConnection = (mediaStream) => {
-        const newConnection = new PeerConnection(this.props.socket)
+        const connection = new PeerConnection(this.props.socket)
 
-        newConnection.addStream(mediaStream)
+        connection.addStream(mediaStream)
         
-        // newConnection.onStreamAdded = (stream):void => {
-        //     const newPeerConnections = [...this.state.peerConnections, stream]
-        //     this.setState({
-        //         peerConnections: newPeerConnections
-        //     })
-        //     console.log('------------ STREAM', stream)
-        // }
+        connection.onStreamAdded = (stream):void => {
+            axios.get(`/api/stream?participantid=${stream.participantid}`).then(response => {
+                console.log('------------ response.data', response.data)
+                const peer = response.data
+                console.log('[[[[ONSTREAMADDED]]]]', stream, this.state.successfulConnections)
+                const newSuccessfulConnections = [...this.state.successfulConnections]
+                newSuccessfulConnections.push(stream)
 
-        newConnection.onStreamEnded = () => {   
+                this.setState({
+                    successfulConnections: newSuccessfulConnections
+                })
+                this.props.socket.emit('updateConnection', {socketId: this.props.socket.id, openConnection: this.initializeConnection(mediaStream).userid, participantid: stream.participantid})
+            })
+        }
+
+        connection.onStreamEnded = () => {   
             console.log('------------ stream END')
         }
 
-        newConnection.onParticipationRequest = (userid) => {
-            console.warn('PARTICIPATION REQUEST')
-            newConnection.acceptRequest(userid)
+        connection.onParticipationRequest = (userid) => {
+            console.warn('PARTICIPATION REQUEST FROM: ' + userid)
+            connection.acceptRequest(userid)
+            // this.props.socket.emit('updateConnection', {socketid: this.props.socket.id, connectionid: userid})
         }
 
-        console.warn('NEW PEERCONNECTION MADE', newConnection)
+        console.warn('NEW PEERCONNECTION MADE', connection)
 
-        return newConnection
+        return connection  
     }
 
-    async newPendingConnection(username, room): void {
+    async newConnection(username, room): void {
         const userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true}}) : null
         const usersInRoom = await axios.get(`/api/users-in-room?room=${room}`)
         try {
             if(userMedia && usersInRoom) {
-                console.warn('------------ usersInRoom  data axios', usersInRoom)
-                let connectionArray
-                if(usersInRoom.data.length) {
-                    // There are already users in the current room
-                    connectionArray = usersInRoom.data.map(user => this.initializeConnection(userMedia, user))
-                    // Loop through connectionArray and sendParticipation request to each user in usersInRoom.data
-                    for(let i=0; i<connectionArray.length; i++) {
-                        console.log('------------ connectionArray[i]', connectionArray[i])
-                        connectionArray[i].sendParticipationRequest(usersInRoom.data[i].openConnection.userid)
-                    }
-                } else {
-                    // This user is the first one in the room and needs an initial peer connection
-                    connectionArray = []
-                }
-                    this.setState(prevState => {
-                        return { pendingConnections: [...prevState.pendingConnections, ...connectionArray ]}
-                    })
-
-                    const connectionData = {
+                let connectionData = {
                         username,
                         room,
-                        openConnection: this.initializeConnection(userMedia),
-                        currentConnnections: connectionArray,
-                        socketid: this.props.socket.id
+                        openConnection: null,
+                        connections: [],
+                        socketId: this.props.socket.id
                     }
+                if(usersInRoom.data.length) {
+                    // There are already users in the current room, send a connection request to each one's open connection
+                    console.log('CURRENT USERS IN ROOM ====>', usersInRoom.data)
+                    usersInRoom.data.forEach(user => {
+                        let newConnection = this.initializeConnection(userMedia)
+                        connectionData.openConnection = newConnection.userid
+                        console.log('+++++++ Sending participation request to: ', user.openConnection, " from: ", newConnection.userid)
+                        newConnection.sendParticipationRequest(user.openConnection)
+                    })
+                } else {
+                    connectionData.openConnection = this.initializeConnection(userMedia).userid
+                }
 
-                    this.props.socket.emit('join', connectionData)
 
-
+                this.props.socket.emit('join', connectionData)
             }
         } catch(error) {
             console.error(error)
         }
     }
-
-    // async accessUserMedia(username: string, room: string): Promise<mixed> | void {
-    //     let userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true}}) : null
-    //     try {
-    //         if(userMedia) {
-    //             this.peerConnection.addStream(userMedia)
-    //             this.setState({
-    //                 rtcConnection: this.peerConnection
-    //             }, () => {
-    //                 const streamData = {
-    //                     username,
-    //                     room,
-    //                     userid: this.peerConnection.userid,
-    //                     socketid: this.props.socket.id
-    //                 }
-    //                 this.props.socket.emit('join', streamData)
-    //             })
-    //             return userMedia
-    //         }
-    //     } catch(error) {
-    //         console.error(error)
-    //     }
-    // }
 
     render(): React.Node {
         console.groupCollapsed('MediaConfiguration')
@@ -175,10 +136,7 @@ class CommunicationProvider extends React.Component<Props, State> {
         console.groupEnd()
 
         const connectionTools: {accessUserMedia: MixedFunction, initialize: MixedFunction, acceptOffer: MixedFunction} = {
-            newPendingConnection: this.newPendingConnection,
-            acceptOffer: this.acceptOffer,
-            makeOffer: this.makeOffer,
-            pendingConnections: this.state.pendingConnections,
+            newConnection: this.newConnection,
             successfulConnections: this.state.successfulConnections
         }
 

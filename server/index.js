@@ -27,7 +27,7 @@ io.sockets.on('connection', socket => {
         if(!onlineUsers.find(user => user === userData)) {
             onlineUsers.push(userData)
         }
-        console.log('CURRENT STREAMS', onlineUsers)
+        console.log('CONNECTIONS ONLINE', onlineUsers)
         const usersInRoom = onlineUsers.filter(user => { 
             return user.room === room
         })
@@ -35,10 +35,43 @@ io.sockets.on('connection', socket => {
     })
 
     socket.on('message', data => {
-        // socket.broadcast.emit('message', data)
-        console.log('MESSAGE FROM PEERCONNECTION', data)
-        let currentUser = onlineUsers.find(user => user.socketid === socket.id)
-        currentUser && io.in(currentUser.room).emit('message', data)
+        socket.broadcast.emit('message', data)
+        // let requestedUser = onlineUsers.find(user => user.openConnection.userid === data.to)
+        // console.log('oooooooo => requestedUser', requestedUser)
+        // requestedUser && io.in(requestedUser.room).emit('message', data)
+    })
+
+    socket.on('updateConnection', data => {
+        console.log('UPDATE CONNECTION', data)
+
+
+        let currentUser = onlineUsers.find(user => user.socketId === data.socketId)
+        let newConnection = onlineUsers.find(user => user.openConnection == data.participantid)
+        
+        // let newConnectionIndex = onlineUsers.findIndex(user => user.socketid === data.participantid)
+
+        if(currentUser) {
+            // const currentUser = onlineUsers[currentUserIndex]
+            // const newConnection = onlineUsers[newConnectionIndex]
+            // const connectionData = {
+            //     username: newConnection.username, 
+            //     room: newConnection.room, 
+            //     openConnection: newConnection.openConnection, 
+            //     socketId: newConnection.socketId
+            // }
+            // onlineUsers[currentUserIndex].connections.push(connectionData)
+            currentUser.connections.push({id: currentUser.openConnection, participantid: data.participantid})
+            if(newConnection.connections.find(newConnection => currentUser.connections.map(connection => +connection.id).includes(+newConnection.participantid))) {
+                currentUser.openConnection = data.openConnection
+                newConnection.openConnection = newConnection.pendingConnection
+                newConnection.pendingConnection = null
+            } else {
+                currentUser.pendingConnection = data.openConnection
+            }
+            console.log('UPDATE ONLINE', onlineUsers)
+        } else {
+            console.log('~~USERS NOT FOUND~~')
+        }
     })
 
     socket.on('userPresence', data => {
@@ -57,6 +90,17 @@ app.get('/api/users-in-room', (req, res) => {
     const usersInRoom = onlineUsers.filter(user => user.room === room)
     console.log('------REQUEST USERS')
     res.status(200).send(usersInRoom)
+})
+
+app.get('/api/stream', (req, res) => {
+    const { participantid } = req.query
+    const selectedUser = onlineUsers.find(user => user.openConnection == participantid)
+    console.log('------------ selectedUser', selectedUser, participantid)
+    if(selectedUser) {
+        res.status(200).send(selectedUser)
+    } else {
+        res.status(404).send('No user found!')
+    }
 })
 
 const path = require("path");

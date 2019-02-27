@@ -59,11 +59,12 @@
 
             if (sdp.type == 'answer') {
                 console.log('=== ANSWERCONNECTION', root)
-                root.peers[root.participant].peer.setRemoteDescription(sdp)
+                root.peers[root.participant].setRemoteDescription(sdp)
             }
         };
 
         root.acceptRequest = function(userid) {
+            console.warn('ACCPETING REQUEST', root)
             root.peers[userid] = Offer.createOffer(merge(options, {
                 MediaStream: root.MediaStream
             }));
@@ -74,10 +75,11 @@
         this.onice = function(message) {
             var peer = root.peers[message.userid];
             if (peer) {
+                console.log('--ONICE -- peer', message.candidate)
                 peer.addIceCandidate(message.candidate);
-                for (var i = 0; i < candidates.length; i++) {
-                    peer.addIceCandidate(candidates[i]);
-                }
+                // for (var i = 0; i < candidates.length; i++) {
+                //     peer.addIceCandidate(candidates[i]);
+                // }
                 candidates = [];
             } else {
                 candidates.push(candidates);
@@ -282,6 +284,7 @@
             this.peer.setRemoteDescription(new RTCSessionDescription(sdp));
         },
         addIceCandidate: function(candidate) {
+            console.log('??CulpritCandidate??', candidate)
             this.peer.addIceCandidate(new RTCIceCandidate({
                 sdpMLineIndex: candidate.sdpMLineIndex,
                 candidate: candidate.candidate
@@ -321,7 +324,7 @@
                 if (event.candidate)
                     config.onicecandidate(event.candidate);
             };
-            console.log('------------ IN ANSWER', peer)
+
             peer.setRemoteDescription(config.sdp).then(function() {
                 peer.createAnswer(offerAnswerConstraints).then(function(sdp) {
                     peer.setLocalDescription(sdp);

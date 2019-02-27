@@ -1,7 +1,5 @@
 import * as React from 'react'
-import hark from 'hark'
 import PeerAudio from './Utility/PeerAudio'
-import axios from 'axios'
 
 // Component props and state go here
 type Props = {
@@ -36,15 +34,16 @@ export default class Room extends React.Component<Props, State> {
         //         users: data
         //     })
         // })
-
+// 
         this.props.socket.on('message', data => {
+            console.log('---->>>>>  MESSAGE', data)
             // if(data.broadcasting && data.userid !== this.props.rtcConnection.userid) {
             //     this.props.makeOffer(data.userid)
             // }
-            if(data.participationRequest && !this.props.pendingConnections.find(connection => connection.userid === data.userid)) {
-                console.log('------------ data', data)
-                this.props.acceptOffer(data.userid)
-            }
+            // if(data.participationRequest && !this.props.pendingConnections.find(connection => connection.userid === data.userid)) {
+            //     console.log('------------ data', data)
+            //     this.props.acceptOffer(data.userid)
+            // }
         })
 
         // this.props.socket.on('pendingRequests', data => {
@@ -68,25 +67,9 @@ export default class Room extends React.Component<Props, State> {
     }
 
     componentDidUpdate(prevProps: Props, prevState: State) {
-        if(prevProps.connectionTools !== this.props.connectionTools) {
-            // this.audio.srcObject = this.props.rtcConnection.MediaStream
-            // const speech = hark(this.props.connectionStatus)
-            // speech.on('speaking', () => {
-            //     this.setState({
-            //         speaking: true
-            //     })
-            // })
-            // speech.on('stopped_speaking', () => {
-            //     this.setState({
-            //         speaking: false
-            //     })
-            // })
-        }
-        if(prevProps.peerConnections !== this.props.peerConnections) {
-            const audioElements = this.props.peerConnections.map((stream, key) => {
-                return <PeerAudio key={key} media={stream} />
-                // console.log('------------ this.audio', this.audio)
-                // audioElement.srcObject = stream.stream
+        if(prevProps.successfulConnections !== this.props.successfulConnections) {
+            const audioElements = this.props.successfulConnections.map((stream, key) => {
+                return <PeerAudio key={stream.participantid} media={stream} />
 
             })
             this.setState({
@@ -103,23 +86,10 @@ export default class Room extends React.Component<Props, State> {
 
     joinRoom = (): void => {
         const { username, room } = this.state
-        if(!this.state.users.find(user => user ? user.socketid === this.props.socket.id : false)) {
-            this.props.newPendingConnection(username, room)
-        }
-        // const streamData = {
-        //     username,
-        //     room,
-        //     stream: this.props.connectionStatus,
-        //     rtcConnection: this.props.rtcConnection
-        // }
-        // this.props.socket.emit('join', streamData)
+        this.props.newConnection(username, room)
     }
 
-    render(): React.Node {
-        console.log('------------ this.props', this.props)
-        console.log('STATE', this.state)
-        const userList = []
-        
+    render(): React.Node { 
         return (
             <div>
             Username:
@@ -128,18 +98,6 @@ export default class Room extends React.Component<Props, State> {
                 <input type='text' name='room' onChange={(e) => this.handleInput(e)} />
                 <button onClick={this.joinRoom}>Join Room</button>
                 {this.state.audioTracks}
-                {/* <audio id={`audio-track`} ref={audio => {this.audio = audio}} controls volume='true' type='MediaStream'></audio> */}
-                {this.state.speaking &&
-                <div style={{width: '100px', height: '200px', background: 'green'}}></div>
-                }
-            Users:
-                {this.state.users.length && this.state.users.map((user,index) => {
-                        return(
-                        <div key={index}>{user.username}</div>
-                        // <div onClick={this.props.answer(user.rtcConnection.userid)}>{user.userid}</div>
-                        )
-                    }
-                )}
             </div>
         )
     }
