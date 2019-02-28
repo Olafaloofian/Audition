@@ -36,7 +36,7 @@ io.sockets.on('connection', socket => {
 
     socket.on('request', data => {
         console.log('EMITTING DATA TO: ', data.to)
-        io.in(data.room).emit('request', data)
+        socket.emit('requestData', data)
     })
 
     socket.on('message', data => {

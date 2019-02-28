@@ -61,7 +61,7 @@ class CommunicationProvider extends React.Component<Props, State> {
         }
         this.newConnection = this.newConnection.bind(this)
         this.makeConnection = this.makeConnection.bind(this)
-        this.props.socket.on('request', data => {
+        this.props.socket.on('requestData', data => {
             console.log('-request data in room', data)
             // this.makeConnection(data)
         })
