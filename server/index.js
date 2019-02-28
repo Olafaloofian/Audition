@@ -34,6 +34,11 @@ io.sockets.on('connection', socket => {
         io.in(room).emit('roomUsers', usersInRoom)
     })
 
+    socket.on('request', data => {
+        console.log('EMITTING DATA TO: ', data.to)
+        io.in(data.room).emit('request', data)
+    })
+
     socket.on('message', data => {
         socket.broadcast.emit('message', data)
         // let requestedUser = onlineUsers.find(user => user.openConnection.userid === data.to)
@@ -43,7 +48,6 @@ io.sockets.on('connection', socket => {
 
     socket.on('updateConnection', data => {
         console.log('UPDATE CONNECTION', data)
-
 
         let currentUser = onlineUsers.find(user => user.socketId === data.socketId)
         let newConnection = onlineUsers.find(user => user.openConnection == data.participantid)

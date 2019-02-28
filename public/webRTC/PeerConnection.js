@@ -64,7 +64,7 @@
         };
 
         root.acceptRequest = function(userid) {
-            console.warn('ACCPETING REQUEST', root)
+            console.warn('ACCPETING REQUEST FROM: ', userid, root)
             root.peers[userid] = Offer.createOffer(merge(options, {
                 MediaStream: root.MediaStream
             }));
@@ -156,13 +156,15 @@
 			if (message.userid == root.userid) return;
             root.participant = message.userid;
 
-            // for pretty logging
-            console.debug(JSON.stringify(message, function(key, value) {
-                if (value && value.sdp) {
-                    console.log(value.sdp.type, '---', value.sdp.sdp);
-                    return '';
-                } else return value;
-            }, '---'));
+            // for pretty logging. Only show console logs for root's messages
+            if(message.to == root.userid) {
+                console.debug(JSON.stringify(message, function(key, value) {
+                    if (value && value.sdp) {
+                        console.log(value.sdp.type, '---', value.sdp.sdp);
+                        return '';
+                    } else return value;
+                }, '---'));
+            }
 
             // if someone shared SDP
             if (message.sdp && message.to == root.userid) {

@@ -56,9 +56,38 @@ class CommunicationProvider extends React.Component<Props, State> {
     constructor(props: Props) {
         super(props)
         this.state = {
-            successfulConnections: []
+            successfulConnections: [],
+            user: {}
         }
         this.newConnection = this.newConnection.bind(this)
+        this.makeConnection = this.makeConnection.bind(this)
+        this.props.socket.on('request', data => {
+            console.log('-request data in room', data)
+            // this.makeConnection(data)
+        })
+    }
+
+    componentDidMount() {
+    }
+
+    async makeConnection(data) {
+        const userMedia: PrimitivePromise = navigator.mediaDevices ? await navigator.mediaDevices.getUserMedia({audio: {echoCancellation: true}}) : null
+        try {
+            if(userMedia) {
+                console.log('------------ this.state.user', this.state.user)
+                if(this.state.user.connections.find(connection => connection.participantid !== data.openConnection)) {
+                    const connection = this.initializeConnection(userMedia)
+                    const userCopy = {...this.state.user}
+                    userCopy.connections.push({id: connection.userid, participantid: data.openConnection})
+                    this.setState({
+                        user: userCopy
+                    })
+                    connection.sendParticipationRequest(data.openConnection)
+                }
+            }
+        } catch(error) {
+            console.log('------------ error', error)
+        }
     }
 
     initializeConnection = (mediaStream) => {
@@ -79,6 +108,10 @@ class CommunicationProvider extends React.Component<Props, State> {
                 })
                 this.props.socket.emit('updateConnection', {socketId: this.props.socket.id, openConnection: this.initializeConnection(mediaStream).userid, participantid: stream.participantid})
             })
+        }
+
+        connection.onUserFound = (userid) => {
+            console.log('------------ userid', userid)
         }
 
         connection.onStreamEnded = () => {   
@@ -114,15 +147,16 @@ class CommunicationProvider extends React.Component<Props, State> {
                     usersInRoom.data.forEach(user => {
                         let newConnection = this.initializeConnection(userMedia)
                         connectionData.openConnection = newConnection.userid
-                        console.log('+++++++ Sending participation request to: ', user.openConnection, " from: ", newConnection.userid)
-                        newConnection.sendParticipationRequest(user.openConnection)
+                        this.props.socket.emit('request', {...connectionData, to: user.socketId })
+                        // console.log('+++++++ Sending participation request to: ', user.openConnection, " from: ", newConnection.userid)
+                        // newConnection.sendParticipationRequest(user.openConnection)
                     })
-                } else {
-                    connectionData.openConnection = this.initializeConnection(userMedia).userid
                 }
 
-
                 this.props.socket.emit('join', connectionData)
+                this.setState({
+                    user: connectionData
+                })
             }
         } catch(error) {
             console.error(error)
